@@ -102,7 +102,7 @@
 
         methods: {
             sliderItemCreated() {
-                if (!this.reafy) return;
+                if (!this.ready) return;
 
                 clearTimeout(this.reInitTimer);
                 this.reInitTimer = setTimeout(() => {
@@ -111,7 +111,7 @@
             },
 
             sliderItemDestroyed() {
-                if (!this.reafy) return;
+                if (!this.ready) return;
 
                 clearTimeout(this.reInitTimer);
                 this.reInitTimer = setTimeout(() => {
@@ -142,7 +142,7 @@
              * @description 负责移动元素
              * @param element
              * @param offset
-             * @param speed
+             * @param speed 控制元素动画速度，如果没有则不显示动画
              * @param callback
              */
             translate(element, offset, speed, callback) {
@@ -175,12 +175,27 @@
 
             /**
              * @description 接受各种命令
-             * @param towards 移动方向
+             * @param towards 移动方向，null || 'prev' || 'next' || 'goto'
              * @param options
              */
             doAnimate(towards, options) {
                 if (this.$children.length === 0) return;
                 if (!options && this.$children.length <2) return;
+
+                /*if (towards === 'next') {
+                    prevPage = pages[index - 1];
+                    nextPage = pages[index + 1];
+
+                    if (this.continuous && pages.length > 1) {
+                        if (!prevPage) {
+                            prevPage = pages[pages.length - 1];
+                        } else if (!nextPage) {
+                            nextPage = pages[0];
+                        }
+                    }
+                }*/
+
+                /** ---- **/
 
                 // 处理当前页、下一页、上一页
                 let prevPage, nextPage, currentPage, pageWidth, offsetLeft;
@@ -189,8 +204,8 @@
                     pages = this.pages,
                     pageCount = pages.length;
 
-                // 这块的处理为什么放这？
-                if (options === undefined) {
+                // 处理 towards 为 'prev' || ''next' || 'goto'
+                if (towards !== null) {
                     options = options || {};
                     pageWidth = this.$el.clientWidth;
                     currentPage = pages[index];
@@ -201,16 +216,16 @@
                     } else {
                         prevPage = pages[index - 1];
                         nextPage = pages[index + 1];
-                    }
-
-                    if (this.continuous && pages.length > 1) {
-                        if (!prevPage) {
-                            prevPage = pages[pages.length - 1];
+                        if (this.continuous && pages.length > 1) {
+                            if (!prevPage) {
+                                prevPage = pages[pages.length - 1];
+                            }
+                            if (!nextPage) {
+                                nextPage = pages[0];
+                            }
                         }
-                        if (!nextPage) {
-                            nextPage = pages[0];
-                        }
                     }
+                    // 将上一页和下一页的位置调整好
                     if (prevPage) {
                         prevPage.style.display = 'block';
                         this.translate(prevPage, -pageWidth);
@@ -232,7 +247,7 @@
 
                 // 改变当前 index
                 if (towards === 'prev') {
-                    if (_index > 0) {
+                    if (index > 0) {
                         newIndex = index -1;
                     }
                     if (this.continuous && index === 0) {
@@ -249,8 +264,6 @@
                     if (options.newIndex > -1 && options.newIndex < pageCount) {
                         newIndex = options.newIndex;
                     }
-                } else {
-                    alert('towards not found')
                 }
 
                 let callback = () => {
@@ -286,17 +299,16 @@
                             this.translate(prevPage, 0, speed);
                         }
                     } else if (towards === 'goto') {
-                        // goto 命令怎么使用？
                         if (prevPage) {
                             this.translate(currentPage, pageWidth, speed, callback);
-                            this.translate(prevPage, 0,speed);
+                            this.translate(prevPage, 0, speed);
                         } else if (nextPage) {
                             this.translate(currentPage, -pageWidth, speed, callback);
                             this.translate(nextPage, 0, speed);
                         }
                     } else {
                         this.translate(currentPage, 0, speed, callback());
-                        // TODO: 这里没看懂
+                        // 处理拖拽或触摸移动偏移
                         if (typeof offsetLeft !== 'undefined') {
                             if (prevPage && offsetLeft > 0) {
                                 this.translate(prevPage, pageWidth * -1, speed);
@@ -328,7 +340,6 @@
              */
             goto(newIndex) {
                 if (this.index === newIndex) return;
-
                 if (newIndex < this.index) {
                     this.doAnimate('goto', {
                         newIndex,

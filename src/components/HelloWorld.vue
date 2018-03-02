@@ -1,11 +1,14 @@
 <template>
     <div class="main-page">
         <div class="part-1">
-            <slider class="slider-out" :auto="0" :continuous="true" :show-indicators="true" :defaultIndex="0">
+            <slider class="slider-out" :auto="0" :continuous="true" :show-indicators="true" :defaultIndex="0" ref="slider">
                 <slider-item class="item-1">111</slider-item>
                 <slider-item class="item-2">222</slider-item>
                 <slider-item class="item-3">333</slider-item>
+                <slider-item class="item-4">444</slider-item>
             </slider>
+            <button @click="prev()"></button>
+            <button @click="next()"></button>
         </div>
     </div>
 </template>
@@ -21,6 +24,16 @@
             Slider: Slider,
             SliderItem: SliderItem,
         },
+
+        methods: {
+            next() {
+                this.$refs.slider.next();
+            },
+
+            prev() {
+                this.$refs.slider.prev();
+            },
+        }
     }
 </script>
 
@@ -38,6 +51,10 @@
     }
     .item-3 {
         background-color: #ff2d4b;
+        color: #fff;
+    }
+    .item-4 {
+        background-color: #e2e2e2;
         color: #fff;
     }
 </style>
