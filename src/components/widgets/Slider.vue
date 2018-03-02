@@ -182,21 +182,6 @@
                 if (this.$children.length === 0) return;
                 if (!options && this.$children.length <2) return;
 
-                /*if (towards === 'next') {
-                    prevPage = pages[index - 1];
-                    nextPage = pages[index + 1];
-
-                    if (this.continuous && pages.length > 1) {
-                        if (!prevPage) {
-                            prevPage = pages[pages.length - 1];
-                        } else if (!nextPage) {
-                            nextPage = pages[0];
-                        }
-                    }
-                }*/
-
-                /** ---- **/
-
                 // 处理当前页、下一页、上一页
                 let prevPage, nextPage, currentPage, pageWidth, offsetLeft;
                 let speed = this.speed || 30,
@@ -360,6 +345,7 @@
                 let element = this.$el;
                 let dragState = this.dragState;
                 let touch = event.changedTouches? event.changedTouches[0] : event;
+                let pages = this.pages;
 
                 dragState.startTime = new Date();
                 dragState.startLeft = touch.pageX;
@@ -368,6 +354,101 @@
 
                 dragState.pageWidth = element.offsetWidth;
                 dragState.pageHeight = element.offsetHeight;
+
+                let prevPage = pages[this.index - 1],
+                    dragPage = pages[this.index],
+                    nextPage = pages[this.index + 1];
+
+                if (this.continuous && pages.length > 1) {
+                    if (!prevPage) {
+                        prevPage = pages[pages.length - 1];
+                    } else if (!nextPage) {
+                        nextPage = pages[0];
+                    }
+                }
+
+                dragState.prevPage = prevPage || null;
+                dragState.dragPage = dragPage || null;
+                dragState.nextPage = nextPage || null;
+
+                // TODO: 这里不应该是处理前后页位置的吗
+                if (dragState.prevPage) {
+                    dragState.prevPage.style.display = 'block';
+                }
+
+                if (dragState.nextPage) {
+                    dragState.nextPage.style.display = 'block';
+                }
+            },
+
+            doOnTouchMove(event) {
+                if (this.noDrag || this.disabled) return;
+
+                let dragState = this.dragState;
+                let touch = event.changedTouches? event.changedTouches[0] : event;
+
+                dragState.currentLeft = touch.pageX;
+                dragState.currentTop = touch.pageY;
+                dragState.currentTopAbsolute = touch.clientY;
+
+                let offsetLeft = dragState.currentLeft - dragState.startLeft;
+                let offsetTop = dragState.currentTopAbsolute - dragState.startTopAbsolute;
+
+                let distanceX = Math.abs(offsetLeft);
+                let distanceY = Math.abs(offsetTop);
+                if (distanceX < 5 || (distanceX >= 5 && distanceY >= 1.73 * distanceX)) {
+                    this.userScrolling = true;
+                    return;
+                } else {
+                    this.userScrolling = false;
+                    event.preventDefault();
+                }
+
+                offsetLeft = Math.min(Math.max(-dragState.pageWidth + 1, offsetLeft), dragState.pageWidth - 1);
+
+                let towards = offsetLeft < 0? 'next' : 'prev';
+                if (dragState.prevPage && towards === 'prev') {
+                    this.translate(dragState.prevPage, offsetLeft - dragState.pageWidth);
+                }
+                this.translate(dragState.dragPage, offsetLeft);
+                if (dragState.nextPage && towards === 'next') {
+                    this.translate(dragState.nextPage, offsetLeft + dragState.pageWidth);
+                }
+            },
+
+            doOnTouchEnd() {
+                if (this.noDrag || this.disabled) return;
+
+                let dragState = this.dragState;
+                let towards = null;
+                let offsetLeft = dragState.currentLeft - dragState.startLeft;
+                let offsetTop = dragState.currentTop - dragState.startTop
+                let pageWidth = dragState.pageWidth;
+                let index = this.index;
+                let pageCount = this.pages.length;
+
+                if (Math.abs(offsetLeft) > pageWidth / 2) {
+                    towards = offsetLeft < 0 ? 'next' : 'prev';
+                }
+
+                if (!this.continuous) {
+                    if ((index === 0 && towards === 'prev') || (index === pageCount - 1 && towards === 'next')) {
+                        towards = null;
+                    }
+                }
+                if (this.$children.length < 2) {
+                    towards = null;
+                }
+
+                this.doAnimate(towards, {
+                    offsetLeft: offsetLeft,
+                    pageWidth: dragState.pageWidth,
+                    prevPage: dragState.prevPage,
+                    currentPage: dragState.dragPage,
+                    nextPage: dragState.nextPage
+                });
+                this.dragState = {};
+
             },
 
             /***** PC端用户拖动时间 *****/
@@ -379,7 +460,23 @@
                 this.dragging = true;
                 this.userScrolling = false;
                 this.doOnTouchStart(event);
-            }
+            },
+
+            dragMoveEvent(event) {
+                if (!this.dragging) return;
+                this.doOnTouchMove(event);
+            },
+
+            dragEndEvent(event) {
+                if (this.userScrolling) {
+                    this.dragging = false;
+                    this.dragState = {};
+                    return;
+                }
+                if (!this.dragging) return;
+                this.doOnTouchEnd(event);
+                this.dragging = false;
+            },
         },
 
         mounted() {
@@ -396,7 +493,10 @@
             this.reInitPages();
 
             // TODO: 轮播图拖动事件绑定
-
+            let element = this.$el;
+            element.addEventListener('mousedown', this.dragStartEvent);
+            element.addEventListener('mousemove', this.dragMoveEvent);
+            element.addEventListener('mouseup', this.dragEndEvent);
         }
     }
 </script>
