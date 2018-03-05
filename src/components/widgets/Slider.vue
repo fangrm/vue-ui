@@ -338,7 +338,7 @@
                 }
             },
 
-            // TODO: 轮播图拖动时间函数
+            // TODO: 轮播图拖动事件函数
             doOnTouchStart(event) {
                 if (this.noDrag || this.disabled) return;
 
@@ -492,11 +492,14 @@
 
             this.reInitPages();
 
-            // TODO: 轮播图拖动事件绑定
             let element = this.$el;
             element.addEventListener('mousedown', this.dragStartEvent);
             element.addEventListener('mousemove', this.dragMoveEvent);
             element.addEventListener('mouseup', this.dragEndEvent);
+
+            element.addEventListener('touchstart', this.dragStartEvent);
+            element.addEventListener('touchmove', this.dragMoveEvent);
+            element.addEventListener('touchend', this.dragEndEvent);
         }
     }
 </script>
