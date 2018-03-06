@@ -35,7 +35,7 @@
             <div class="calendar-month" v-show="currentPanel === 'months'">
                 <a v-for="(month, index) in months" @click="selectMonth(index)" :class="{'current': currentMonth === index}">{{ month }}</a>
             </div>
-            <div class="calendar-time" v-show="currentPanel === 'time'">
+            <!--<div class="calendar-time" v-show="currentPanel === 'time'">
                 <div class="time-list-wrapper" v-if="timeSelectOptions.length > 0">
                     <ul class="time-list">
                         <li
@@ -67,7 +67,7 @@
                         </li>
                     </ul>
                 </div>
-            </div>
+            </div>-->
         </div>
     </div>
 </template>
@@ -116,7 +116,7 @@
         props: {
             startAt: null,
             endAt: null,
-            value: null,
+            value: null, // 要显示的时间值
             show: Boolean,
         },
 
@@ -136,6 +136,194 @@
                 currentPanel: 'date',
                 times: times,
             };
+        },
+
+        methods: {
+            updateNow() {
+                this.now = this.value? new Date(this.value) : new Date();
+            },
+
+            // 更新面板选择时间
+            updateCalendar() {
+                const getCalendar = (time, firstDay, length, classes) => {
+                    return Array.apply(null, { length }).map((v, i) => {
+                        let day = firstDay + 1;
+                        let date = new Date(time.getFullYear(), time.getMonth(), day, 0, 0, 0);
+                        date.setDate(day);
+                        return {
+                            title: date.toLocaleDateString(),
+                            date,
+                            day,
+                            classes
+                        };
+                    });
+                };
+
+                let firstDayOfWeek = this.$parent.firstDayOfWeek;
+                let time = new Date(this.now);
+                time.setDate(0); // 把时间切换成上个月的最后一天
+                let lastMonthLength = (time.getDay() + 7 - firstDayOfWeek) % 7 + 1;
+                let lastMonthFirstDay = time.getDate() - (lastMonthLength - 1);
+                let lastMonth = getCalendar(time, lastMonthFirstDay, lastMonthLength, 'lastMonth');
+
+                time.setMonth(time.getMonth() + 2, 0); // 切换到这个月的最后一天
+                let curMonthLength = time.getDate();
+                let curMonth = getCalendar(time, 1, curMonthLength, 'curMonth');
+
+                time.setMonth(time.getMonth() + 1, 1);
+                let nextMonthLength = 42 - (lastMonthLength + curMonthLength);
+                let nextMonth = getCalendar(time, 1,nextMonthLength, 'nextMonth');
+
+                let index = 0,
+                    resIndex = 0;
+                let arr = lastMonth.concat(curMonth, nextMonth);
+                let result = new Array(6);
+                while (index < 42) {
+                    result[resIndex++] = arr.slice(index, (index += 7));
+                }
+                this.dates = result;
+            },
+
+            getDateClasses(cell) {
+                let classes = [];
+                let cellTime = new Date(cell.date).setHours(0, 0, 0, 0);
+                let cellEndTime = new Date(cell.date).setHours(23, 59, 59, 999);
+                let curTime = this.value? new Date(this.value).setHours(0, 0, 0, 0) : 0;
+                let startTime = this.startAt? new Date(this.startAt).setHours(0, 0, 0, 0) : 0;
+                let endTime = this.endAt? new Date(this.endAt).setHours(0, 0, 0, 0) : 0;
+                let today = new Date().setHours(0, 0, 0, 0);
+
+                if (
+                    this.$parent.disabledDays.some(v => new Date(v).setHours(0, 0, 0, 0) === cellTime)
+                    || (this.$parent.notBefore !== '' && cellEndTime < new Date(this.$parent.notBefore).getTime())
+                    || (this.$parent.notAfter !== '' && cellTime > new Date(this.$parent.notAfter).getTime())
+                ) {
+                    return 'disabled'
+                }
+
+                classes.push(cell.classes);
+                if (cellTime === today) {
+                    classes.push('today');
+                }
+
+                if (cellTime === curTime) {
+                    classes.push('current');
+                } else if (startTime) {
+                    if (cellTime < startTime) {
+                        classes.push('disabled');
+                    } else if (curTime && cellTime <= curTime) {
+                        classes.push('inrange');
+                    }
+                } else if (endTime) {
+                    if (cellTime > endTime) {
+                        classes.push('disabled');
+                    } else if (curTime && cellTime >= curTime) {
+                        classes.push('inrange');
+                    }
+                }
+                return classes.join(' ')
+            },
+            //TODO:
+            getTImeClasses() {
+
+            },
+
+            showMonth() {
+                if (this.currentPanel === 'months') {
+                    this.currentPanel = 'date'
+                } else {
+                    this.currentPanel = 'months'
+                }
+            },
+
+            showYears() {
+                if (this.currentPanel === 'years') {
+                    this.currentPanel = 'date';
+                } else {
+                    let firstYear = Math.floor(this.now.getFullYear() / 10) * 10;
+                    let years = [];
+                    for (let i = 0; i < 10; i++) {
+                        years.push(firstYear + i)
+                    }
+                    this.years = years;
+                    this.currentPanel = 'years'
+                }
+            },
+
+            // 前进或后退一年
+            changeYear(flag) {
+                if (this.currentPanel === 'years') {
+                    this.years = this.years.map(v => v + flag * 10);
+                } else {
+                    let now = new Date(this.now);
+                    now.setFullYear(now.getFullYear() + flag, now.getMonth(), 1);
+                    this.now = now;
+                }
+            },
+            changeMonth(flag) {
+                let now = new Date(this.now);
+                now.setMonth(now.getMonth() + flag, 1);
+                this.now = now;
+            },
+
+            selectDate(cell) {
+                let classes = this.getDateClasses(cell);
+                if (classes.indexOf('disable') !== -1) return;
+
+                let date = new Date(cell.date);
+                if (this.$parent.type === 'datetime') {
+                    if (this.value instanceof Date) {
+                        date.setHours(this.value.getHours(), this.value.getMinutes(), this.value.getSeconds());
+                    }
+                    if (this.startAt && date.getTime() < new Date(this.startAt).getTime()) {
+                        date = new Date(this.startAt)
+                    } else if (this.endAt && date.getTime() > new Date(this.endAt).getTime()) {
+                        date = new Date(this.endAt);
+                    }
+                    // TODO: ?
+                    this.currentPanel = 'time';
+                    this.$nextTick(() => {
+                        Array.prototype.forEach.call(
+                            this.$el.querySelectorAll('.mx-time-list-wrapper'),
+                            (el) => {
+                                this.scrollIntoView(el, el.querySelector('.cur-time'))
+                            }
+                        )
+                    });
+                }
+
+                this.now = date;
+                this.$emit('input', date);
+                this.$emit('select');
+            },
+            selectYear(year) {
+                let now = new Date(this.now);
+                now.setFullYear(year);
+                this.now = now;
+                if (this.value) {
+                    this.$emit('input', now);
+                    this.emit('select', true);
+                }
+                this.currentPanel = 'months';
+            },
+            selectMonth(month) {
+                let now = new Date(this.now);
+                now.setMonth(month);
+                this.now = now;
+                if (this.value) {
+                    this.$emit('input', now);
+                    this.$meit('select', true);
+                }
+                this.currentPanel = 'date';
+            },
+            // TODO: 选择时间
+            selectTime() {
+
+            },
+            pickTime() {
+
+            },
+
         },
 
         computed: {
@@ -200,7 +388,24 @@
         },
 
         watch: {
-
+            // TODO: 这里没理解，这种写法
+            show(val) {
+                if (val) {
+                    this.currentPanel = 'date';
+                    this.updateNow();
+                }
+            },
+            value: {
+                handler: 'updateNow',
+                immediate: true,
+            },
+            now: 'updateCalendar',
         },
+
+        filters: {
+            timeText(value) {
+                return ('00' + value).slice(String(value).length);
+            }
+        }
     }
 </script>
