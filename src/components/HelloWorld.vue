@@ -10,12 +10,16 @@
             <button @click="prev()"></button>
             <button @click="next()"></button>
         </div>
+        <div class="part-2">
+            <date-picker v-model="value1" range lang="zh"></date-picker>
+        </div>
     </div>
 </template>
 
 <script>
     import Slider from './widgets/Slider.vue';
     import SliderItem from './widgets/SliderItem.vue';
+    import DatePicker from './widgets/datePicker/datePicker.vue';
 
     export default {
         name: 'HelloWorld',
@@ -23,6 +27,13 @@
         components: {
             Slider: Slider,
             SliderItem: SliderItem,
+            DatePicker: DatePicker,
+        },
+
+        data() {
+            return {
+                value1: '',
+            }
         },
 
         methods: {

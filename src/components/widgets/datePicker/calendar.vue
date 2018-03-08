@@ -1,19 +1,19 @@
 <style lang="scss" scoped>
-
+    @import "../../../style/widget/datepicker";
 </style>
 
 <template>
     <div class="calendar">
-        <div class="header" v-if="currentPage === 'time'">
+        <div class="header" v-if="currentPanel === 'time'">
             <a @click="currentPanel = 'date'">{{ now.toLocalDateString() }}</a>
         </div>
         <div class="header" v-else>
             <a class="prev-icon" @click="changeYear(-1)">&laquo;</a>
             <a class="prev-icon" v-show="currentPanel === 'date'" @click="changeMonth(-1)">&lsaquo;</a>
             <a class="next-icon" @click="changeYear(1)">&raquo;</a>
-            <a class="next-icon" v-show="currentPage === 'date'" @click="changeMonth(1)">&rsaquo;</a>
-            <a class="currnet-month" @click="showMonths">{{ months[currnetMonth] }}</a>
-            <a class="currnet-year" @click="showYears">{{ currentYear }}</a>
+            <a class="next-icon" v-show="currentPanel === 'date'" @click="changeMonth(1)">&rsaquo;</a>
+            <a class="current-month" @click="showMonths">{{ months[currentMonth] }}</a>
+            <a class="current-year" @click="showYears">{{ currentYear }}</a>
         </div>
 
         <div class="content">
@@ -25,7 +25,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="row in dates">
-                        <td v-for="cell in row" :title="ccell.title" :class="getDateClasses(cell)" @click="selectDate(cell)">{{ cell.day }}</td>
+                        <td v-for="cell in row" :title="cell.title" :class="getDateClasses(cell)" @click="selectDate(cell)">{{ cell.day }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -35,7 +35,7 @@
             <div class="calendar-month" v-show="currentPanel === 'months'">
                 <a v-for="(month, index) in months" @click="selectMonth(index)" :class="{'current': currentMonth === index}">{{ month }}</a>
             </div>
-            <!--<div class="calendar-time" v-show="currentPanel === 'time'">
+            <div class="calendar-time" v-show="currentPanel === 'time'">
                 <div class="time-list-wrapper" v-if="timeSelectOptions.length > 0">
                     <ul class="time-list">
                         <li
@@ -51,8 +51,8 @@
                 <div
                     class="time-list-wrapper"
                     v-else
-                    :style="{ width: 100 / time.length + '%' }"
-                    v-for="(item, index) in times"
+                    :style="{ width: 100 / times.length + '%' }"
+                    v-for="(time, index) in times"
                     :key="index"
                 >
                     <ul class="time-list">
@@ -63,11 +63,11 @@
                             :key="num"
                             @click="selectTime(num, index)"
                         >
-                            {{ num || timeText} }
+                            {{ num | timeText}}
                         </li>
                     </ul>
                 </div>
-            </div>-->
+            </div>
         </div>
     </div>
 </template>
@@ -111,6 +111,7 @@
     };
 
     export default {
+        name: 'calendar',
 
         // TODO: propTypes
         props: {
@@ -129,7 +130,7 @@
                 times.push(getTimeArray(60, 1));
             }
             return {
-                months: '',
+                months: translation.months,
                 dates: [], // 日历面板
                 years: [], // 年份面板
                 now: new Date(),
@@ -147,7 +148,7 @@
             updateCalendar() {
                 const getCalendar = (time, firstDay, length, classes) => {
                     return Array.apply(null, { length }).map((v, i) => {
-                        let day = firstDay + 1;
+                        let day = firstDay + i;
                         let date = new Date(time.getFullYear(), time.getMonth(), day, 0, 0, 0);
                         date.setDate(day);
                         return {
@@ -221,14 +222,57 @@
                         classes.push('inrange');
                     }
                 }
-                return classes.join(' ')
-            },
-            //TODO:
-            getTImeClasses() {
-
+                return classes.join(' ');
             },
 
-            showMonth() {
+            getTimeClasses(value, index) {
+                let curValue;
+                let cellTime;
+                const startTime = this.startAt? new Date(this.startAt) : 0;
+                const endTime = this.endAt? new Date(this.endAt) : 0;
+                const classes = [];
+                switch (index) {
+                    case -1:
+                        curValue = this.curHour * 60 + this.curMinute;
+                        cellTime = new Date(this.now).setHours(Math.floor(value / 60), value % 60, 0);
+                        break;
+                    case 0:
+                        curValue = this.curHour;
+                        cellTime = new Date(this.now).setHours(value);
+                        break;
+                    case 1:
+                        curValue = this.curMinute;
+                        cellTime = new Date(this.now).setMinutes(value);
+                        break;
+                    case 2:
+                        curValue = this.curSecond;
+                        cellTime = new Date(this.now).setSeconds(value);
+                        break;
+                }
+                if (
+                    (this.$parent.notBefore !== '' &&
+                        cellTime < new Date(this.$parent.notBefore).getTime()) ||
+                    (this.$parent.notAfter !== '' &&
+                        cellTime > new Date(this.$parent.notAfter).getTime())
+                ) {
+                    return 'disabled';
+                }
+
+                if (value === curValue) {
+                    classes.push('cur-time');
+                } else if (startTime) {
+                    if (cellTime < startTime) {
+                        classes.push('disabled');
+                    }
+                } else if (endTime) {
+                    if (cellTime > endTime) {
+                        classes.push('disabled');
+                    }
+                }
+                return classes.join(' ');
+            },
+
+            showMonths() {
                 if (this.currentPanel === 'months') {
                     this.currentPanel = 'date'
                 } else {
@@ -246,7 +290,7 @@
                         years.push(firstYear + i)
                     }
                     this.years = years;
-                    this.currentPanel = 'years'
+                    this.currentPanel = 'years';
                 }
             },
 
@@ -284,7 +328,7 @@
                     this.currentPanel = 'time';
                     this.$nextTick(() => {
                         Array.prototype.forEach.call(
-                            this.$el.querySelectorAll('.mx-time-list-wrapper'),
+                            this.$el.querySelectorAll('.time-list-wrapper'),
                             (el) => {
                                 this.scrollIntoView(el, el.querySelector('.cur-time'))
                             }
@@ -312,16 +356,38 @@
                 this.now = now;
                 if (this.value) {
                     this.$emit('input', now);
-                    this.$meit('select', true);
+                    this.$emit('select', true);
                 }
                 this.currentPanel = 'date';
             },
-            // TODO: 选择时间
+
             selectTime() {
-
+                let classes = this.getTimeClasses(value, index);
+                if (classes.indexOf('disabled') !== -1) {
+                    return
+                }
+                let date = new Date(this.now);
+                if (index === 0) {
+                    date.setHours(value);
+                } else if (index === 1) {
+                    date.setMinutes(value);
+                } else if (index === 2) {
+                    date.setSeconds(value);
+                }
+                this.now = date;
+                this.$emit('input', date);
+                this.$emit('select');
             },
-            pickTime() {
-
+            pickTime(value) {
+                const classes = this.getTimeClasses(value.hours * 60 + value.minutes, -1);
+                if (classes.indexOf('disabled') !== -1) {
+                    return
+                }
+                const date = new Date(this.now);
+                date.setHours(value.hours, value.minutes, 0);
+                this.now = date;
+                this.$emit('input', date);
+                this.$emit('select');
             },
 
         },
@@ -338,7 +404,7 @@
                 return /h+/.test(this.$parent.format)? '12' : '24';
             },
 
-            timeselectOptions() {
+            timeSelectOptions() {
                 let result = [];
                 let options = this.$parent.timePickerOptions;
                 if (!options) {
@@ -406,6 +472,6 @@
             timeText(value) {
                 return ('00' + value).slice(String(value).length);
             }
-        }
+        },
     }
 </script>

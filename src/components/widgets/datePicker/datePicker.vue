@@ -1,9 +1,14 @@
 <style lang="scss">
-
+    @import "../../../style/widget/datepicker";
 </style>
 
 <template>
-    <div class="datePicker">
+    <div
+        class="datePicker"
+        :class="{'disabled': disabled}"
+        :style="{'width': width + 'px', 'min-width': range? (type === 'datetime'? '320px' : '210px') : '140px'}"
+        v-clickoutside="closePopup"
+    >
         <input
             readonly
             name="date"
@@ -16,7 +21,46 @@
             @mouseleave="hoverIcon"
             @click="togglePopup"
             @mousedown="$event.preventDefault()"
+            v-on:aaa111="testFunc"
         />
+        <i class="input-icon"
+           :class="showCloseIcon ? 'input-icon__close' : 'input-icon__calendar'"
+           @mouseenter="hoverIcon"
+           @mouseleave="hoverIcon"
+           @click="clickIcon" ></i>
+
+        <div class="datePicker-popup"
+             :class="{'range':range}"
+             :style="position"
+             ref="calendar"
+             v-show="showPopup">
+
+            <calendar
+                v-if="!range"
+                v-model="currentValue"
+                @select="selectDate"
+                :show="showPopup"
+            ></calendar>
+            <div v-else style="overflow:hidden" >
+                <div class="datePicker-top" v-if="ranges.length">
+                    <span v-for="range in ranges" @click="selectRange(range)">{{range.text}}</span>
+                </div>
+                <calendar style="width:50%;box-shadow:1px 0 rgba(0, 0, 0, .1)"
+                                v-model="currentValue[0]"
+                                :end-at="currentValue[1]"
+                                @select="selectDate"
+                                :show="showPopup"
+                ></calendar>
+                <calendar style="width:50%;"
+                                v-model="currentValue[1]"
+                                :start-at="currentValue[0]"
+                                @select="selectDate"
+                                :show="showPopup"></calendar>
+            </div>
+            <div class="datePicker-footer" v-if="confirm">
+                <button type="button" class="datePicker-btn datePicker-btn-confirm" @click="confirmDate"> {{ confirmText }}</button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -27,7 +71,7 @@
     export default {
         name: 'datePicker',
 
-        component: { Calendar },
+        components: { Calendar },
 
         props: {
             value: null,
@@ -59,7 +103,7 @@
             },
             disabledDays: {
                 type: Array,
-                default: [],
+                default: () => [],
             },
             notBefore: {
                 default: '',
@@ -79,7 +123,7 @@
             },
             timePickerOptions: {
                 type: Object,
-                default: {},
+                default: () => {},
             },
             confirm: {
                 type: Boolean,
@@ -117,9 +161,9 @@
             value: {
                 handler(val) {
                     if (!this.range) {
-                        this.currentVaule = this.isVaildDate(val)? val : undefined;
+                        this.currentValue = this.isValidDate(val)? val : undefined;
                     } else {
-                        this.currentVaule = this.isVaildRange(val)? val.slice(0, 2) : [undefined, undefined];
+                        this.currentValue = this.isValidRange(val)? val.slice(0, 2) : [undefined, undefined];
                     }
                 },
                 immediate: true,
@@ -127,7 +171,7 @@
 
             showPopup(val) {
                 if (val) {
-                    this.$nickTick(this.displayPopup);
+                    this.$nextTick(this.displayPopup);
                 }
             }
         },
@@ -138,14 +182,14 @@
             },
             innerPlaceholder() {
                 return (
-                    this.placeholder || (this.range? this.translation.placeholder.dateRange : this,translation.placeholder.date)
+                    this.placeholder || (this.range? this.translation.placeholder.dateRange : this.translation.placeholder.date)
                 );
             },
             text() {
-                if (this.range && this.isVaildDate(this.value)) {
+                if (this.range && this.isValidDate(this.value)) {
                     return this.stringify(this.value);
                 }
-                if (this.range && this.isVaildRange(this.value)) {
+                if (this.range && this.isValidRange(this.value)) {
                     return this.stringify(this.value[0]) + ' ~ ' + this.stringify(this.value[1])
                 }
                 return '';
@@ -153,6 +197,11 @@
         },
 
         methods: {
+            testFunc(e) {
+                debugger;
+                console.log(e);
+                console.log(this.$refs.input.value);
+            },
             updateDate() {
                 const val = this.currentValue;
                 if ((!this.range && val) || (this.range && val[0] && val[1])) {
@@ -195,8 +244,141 @@
                 }
             },
             clickIcon() {
-
-            }
+                if (this.disabled) {
+                    return
+                }
+                if (this.showCloseIcon) {
+                    this.$emit('input', '');
+                } else {
+                    this.togglePopup();
+                }
+            },
+            formatDate(date, fmt = 'YYYY-MM-dd HH:mm:ss') {
+                let hour = date.getHours();
+                let map = {
+                    'M+': date.getMonth() + 1, // 月份
+                    '[Dd]+': date.getDate(), // 日
+                    'H+': hour, // 小时
+                    'h+': (hour % 12) || 12, // 小时
+                    'm+': date.getMinutes(), // 分
+                    's+': date.getSeconds(), // 秒
+                    'q+': Math.floor((date.getMonth() + 3) / 3), // 季度
+                    S: date.getMilliseconds(), // 毫秒
+                    'a': hour >= 12 ? 'pm' : 'am',
+                    'A': hour >= 12 ? 'PM' : 'AM'
+                };
+                let str = fmt.replace(/[Yy]+/g, function (str) {
+                    return ('' + date.getFullYear()).slice(4 - str.length);
+                });
+                Object.keys(map).forEach(key => {
+                    str = str.replace(new RegExp(key), function (str) {
+                        const value = '' + map[key];
+                        return str.length === 1? value : ('00' + value).slice(value.length);
+                    })
+                });
+                return str
+            },
+            stringify(date) {
+                return this.formatDate(new Date(date), this.format);
+            },
+            isValidDate(date) {
+                return !!new Date(date).getTime();
+            },
+            isValidRange(date) {
+                return (
+                    Array.isArray(date) &&
+                    date.length === 2 &&
+                    this.isValidDate(date[0]) &&
+                    this.isValidDate(date[1])
+                )
+            },
+            selectRange(range) {
+                this.$emit('input', [range.start, range.end]);
+            },
+            initRanges() {
+                if (Array.isArray(this.shortcuts)) {
+                    this.ranges = this.shortcuts;
+                } else if (this.shortcuts) {
+                    this.ranges = [
+                        {
+                            text: '未来7天',
+                            start: new Date(),
+                            end: new Date(Date.now() + 3600 * 1000 * 24 * 7)
+                        },
+                        {
+                            text: '未来30天',
+                            start: new Date(),
+                            end: new Date(Date.now() + 3600 * 1000 * 24 * 30)
+                        },
+                        {
+                            text: '最近7天',
+                            start: new Date(Date.now() - 3600 * 1000 * 24 * 7),
+                            end: new Date()
+                        },
+                        {
+                            text: '最近30天',
+                            start: new Date(Date.now() - 3600 * 1000 * 24 * 30),
+                            end: new Date()
+                        }
+                    ];
+                    this.ranges.forEach((v, i) => {
+                        v.text = this.translation.pickers[i]
+                    });
+                } else {
+                    this.ranges = [];
+                }
+            },
+            displayPopup() {
+                if (this.disabled) {
+                    return
+                }
+                const dw = document.documentElement.clientWidth;
+                const dh = document.documentElement.clientHeight;
+                const InputRect = this.$el.getBoundingClientRect();
+                const PopupRect = this.$refs.calendar.getBoundingClientRect()
+                this.position = {};
+                if (
+                    dw - InputRect.left < PopupRect.width &&
+                    InputRect.right < PopupRect.width
+                ) {
+                    this.position.left = 1 - InputRect.left + 'px';
+                } else if (InputRect.left + InputRect.width / 2 <= dw / 2) {
+                    this.position.left = 0;
+                } else {
+                    this.position.right = 0;
+                }
+                if (
+                    InputRect.top <= PopupRect.height + 1 &&
+                    dh - InputRect.bottom <= PopupRect.height + 1
+                ) {
+                    this.position.top = dh - InputRect.top - PopupRect.height - 1 + 'px';
+                } else if (InputRect.top + InputRect.height / 2 <= dh / 2) {
+                    this.position.top = '100%';
+                } else {
+                    this.position.bottom = '100%';
+                }
+            },
         },
+
+        directives: {
+            // TODO: 点击其它区域 calendar 消失
+            clickoutside: {
+                bind(el, binding, vnode) {
+                    el['@clickoutside'] = e => {
+                        if (
+                            !el.contains(e.target) &&
+                            binding.expression &&
+                            vnode.context[binding.expression]
+                        ) {
+                            binding.value()
+                        }
+                    };
+                    document.addEventListener('click', el['@clickoutside'], true)
+                },
+                unbind(el) {
+                    document.removeEventListener('click', el['@clickoutside'], true)
+                }
+            }
+        }
     };
 </script>
